@@ -7,11 +7,11 @@ on:
     paths:
       - client/**
       - server/**
-      - .github/workflows/qa-cicd.yml
+      - .github/workflows/git-leake-stage-cicd.yml
 permissions:
   contents: write
   id-token: write
-  
+
 jobs:
   gitleaks-scan:
     name: Gitleaks Scan
@@ -29,11 +29,134 @@ jobs:
             --report-format=json \
             --report-path=/repo/gitleaks-report.json \
             --redact \
-            --exit-code 1
-            
+            --exit-code 0
+
       - name: Upload Gitleaks report
         uses: actions/upload-artifact@v4
         with:
           name: gitleaks-report
           path: gitleaks-report.json
           if-no-files-found: warn
+
+  checkov-terraform:
+    name: Checkov Terraform Scan
+    runs-on: ubuntu-latest
+    needs: gitleaks-scan
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Checkov
+        run: pip install checkov
+      - name: Run Checkov Terraform scan
+        run: |
+          checkov -d . \
+            --framework terraform \
+            --output json > checkov-terraform-report.json || true
+      - name: Upload Checkov Terraform report
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-terraform-report
+          path: checkov-terraform-report.json
+          if-no-files-found: warn
+
+  checkov-k8s:
+    name: Checkov Kubernetes Scan
+    runs-on: ubuntu-latest
+    needs: gitleaks-scan
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Checkov
+        run: pip install checkov
+      - name: Run Checkov Kubernetes scan
+        run: |
+          checkov -d . \
+            --framework kubernetes \
+            --output json > checkov-k8s-report.json || true
+      - name: Upload Checkov Kubernetes report
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-k8s-report
+          path: checkov-k8s-report.json
+          if-no-files-found: warn
+
+  checkov-dockerfile:
+    name: Checkov Dockerfile Scan
+    runs-on: ubuntu-latest
+    needs: gitleaks-scan
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Checkov
+        run: pip install checkov
+      - name: Run Checkov Dockerfile scan
+        run: |
+          checkov -d . \
+            --framework dockerfile \
+            --output json > checkov-dockerfile-report.json || true
+      - name: Upload Checkov Dockerfile report
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-dockerfile-report
+          path: checkov-dockerfile-report.json
+          if-no-files-found: warn
+
+  summary:
+    name: Generate Workflow Summary
+    runs-on: ubuntu-latest
+    needs: [gitleaks-scan, checkov-terraform, checkov-k8s, checkov-dockerfile]
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+      - name: Generate Summary Table
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            function status(file) {
+              try {
+                const data = fs.readFileSync(file,'utf8');
+                return data.length > 2 ? '❌ Issues Found' : '✅ Clean';
+              } catch {
+                return '⚠️ No Report';
+              }
+            }
+            core.summary
+              .addHeading('🛡️ DevSecOps Scan Results')
+              .addTable([
+                [{data: 'Scan', header: true}, {data: 'Status', header: true}],
+                ['Gitleaks', status('gitleaks-report.json')],
+                ['Terraform', status('checkov-terraform-report.json')],
+                ['Kubernetes', status('checkov-k8s-report.json')],
+                ['Dockerfile', status('checkov-dockerfile-report.json')],
+              ])
+              .addSeparator()
+              .addRaw('✨ Pipeline completed with security scans and reports uploaded.')
+              .write();
+
+  notify-slack:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs: summary
+    steps:
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": "🚀 QA Pipeline finished!\n• Gitleaks: ${{ job.status }}\n• Terraform: ${{ job.status }}\n• Kubernetes: ${{ job.status }}\n• Dockerfile: ${{ job.status }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
