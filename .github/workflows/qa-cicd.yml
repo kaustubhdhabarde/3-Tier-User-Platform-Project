@@ -7,7 +7,7 @@ on:
     paths:
       - client/**
       - server/**
-      - .github/workflows/git-leake-stage-cicd.yml
+      - .github/workflows/qa-cicd.yml
 permissions:
   contents: write
   id-token: write
