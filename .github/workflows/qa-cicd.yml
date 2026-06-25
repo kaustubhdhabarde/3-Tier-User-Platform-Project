@@ -3,7 +3,14 @@ name: Enterprise DevSecOps CICD Pipeline
 on:
   push:
     branches:
-      - qa
+      - git-leake-stage
+    paths:
+      - client/**
+      - server/**
+      - .github/workflows/qa-cicd.yml
+  pull_request:
+    branches:
+      - git-leake-stage
     paths:
       - client/**
       - server/**
