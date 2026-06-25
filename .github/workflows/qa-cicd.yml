@@ -11,7 +11,7 @@ on:
 permissions:
   contents: write
   id-token: write
-
+  
 jobs:
   gitleaks-scan:
     name: Gitleaks Scan
@@ -30,7 +30,7 @@ jobs:
             --report-path=/repo/gitleaks-report.json \
             --redact \
             --exit-code 0
-
+            
       - name: Upload Gitleaks report
         uses: actions/upload-artifact@v4
         with:
