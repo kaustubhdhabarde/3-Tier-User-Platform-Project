@@ -393,7 +393,7 @@ jobs:
       - name: Build client
         run: npm run build --if-present
 
-  docker:
+    docker:
     name: Docker Build & Push
     needs:
       - client-build
@@ -478,7 +478,7 @@ jobs:
           format: spdx-json
           output-file: image-sbom.spdx.json
           upload-artifact: true  
-          
+
       - name: Push
         uses: docker/build-push-action@v7
         with:
@@ -486,6 +486,7 @@ jobs:
           tags: |
             kaustubhdhabarde/nodejs-app:${{ github.sha }}
             kaustubhdhabarde/nodejs-app:latest
+
 
 
   update-qa-manifest:
